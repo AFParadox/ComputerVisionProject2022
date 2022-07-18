@@ -1,9 +1,9 @@
 {
     "cmake.debugConfig": {
         "args": [
-            "\"../../../evaluationDataset/rgb/*.jpg\"",
-            "\"../../../evaluationDataset/det/*.txt\"",
-            "\"../../../evaluationDataset/mask/*.png\""
+            "\"../../../docs/evaluationDataset/rgb/*.jpg\"",
+            "\"../../../docs/evaluationDataset/det/*.txt\"",
+            "\"../../../docs/evaluationDataset/mask/*.png\""
         ]
     },
     "files.associations": {

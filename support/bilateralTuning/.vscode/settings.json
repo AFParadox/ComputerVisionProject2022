@@ -1,7 +1,7 @@
 {
     "cmake.debugConfig": {
         "args": [
-            "\"../../../evaluationDataset/rgb/*.jpg\""
+            "\"../../../docs/evaluationDataset/rgb/*.jpg\""
         ]
     },
     "files.associations": {

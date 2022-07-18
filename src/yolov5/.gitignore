@@ -1,0 +1,4 @@
+runs/
+__pycache__/
+demo_yolov5/
+tutorial.ipynb

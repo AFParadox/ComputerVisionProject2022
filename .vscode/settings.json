@@ -1,0 +1,14 @@
+{
+    "cmake.debugConfig": {
+        "args": [
+            "../docs/evaluationDataset/rgb/05.jpg",
+            "../src/yolov5/runs/detect/hand_detect/labels/05.txt"
+        ]
+    },
+    "files.associations": {
+        "iostream": "cpp",
+        "array": "cpp",
+        "string_view": "cpp",
+        "initializer_list": "cpp"
+    }
+}

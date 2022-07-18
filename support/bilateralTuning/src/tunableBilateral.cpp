@@ -15,6 +15,9 @@ void applyFilterOnSliders(int val, void *userdata)
 
     Mat temp = s.original.clone();
 
+    cv::GaussianBlur(s.original, temp, cv::Size(3, 3), 100);
+    cv::addWeighted(s.original, 1.5, temp, -0.5, 0, temp);
+
     for (int i = 0; i < s.n; i++)
     {
         bilateralFilter(temp, s.filtered, s.kSize, s.sigmaColor, s.sigmaSpace);
@@ -39,8 +42,8 @@ void viewDemoRoulette(vector<Mat> imgs)
     namedWindow(s.windowName);
     createTrackbar("n", s.windowName, &s.n, 30, applyFilterOnSliders, &s);
     createTrackbar("Kernel Size", s.windowName, &s.kSize, 20, applyFilterOnSliders, &s);
-    createTrackbar("Sigma Color * 10", s.windowName, &s.intSC, 300, applyFilterOnSliders, &s);
-    createTrackbar("Sigma Space * 10", s.windowName, &s.intSP, 300, applyFilterOnSliders, &s);
+    createTrackbar("Sigma Color * 10", s.windowName, &s.intSC, 600, applyFilterOnSliders, &s);
+    createTrackbar("Sigma Space * 10", s.windowName, &s.intSP, 600, applyFilterOnSliders, &s);
 
     char nxt = 't';
     int i = 0;
