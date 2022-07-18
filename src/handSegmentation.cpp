@@ -10,17 +10,17 @@
 using namespace std;
 using namespace cv;
 
-HandData loadImgAndBboxes(char * imgPath, char * bboxPath)
+HandData loadImgAndBboxes(string imgPath, string bboxPath)
 {
     // check if both input file exists
     if (!filesystem::exists(imgPath))
     {
-        cout << "File \"" << imgPath << "\" does not exists";
+        cout << "File \"" << imgPath << "\" does not exists" << endl;
         exit(EXIT_FAILURE);
     }
     if (!filesystem::exists(bboxPath))
     {
-        cout << "File \"" << imgPath << "\" does not exists";
+        cout << "File \"" << bboxPath << "\" does not exists" << endl;
         exit(EXIT_FAILURE);
     }
 
@@ -87,39 +87,32 @@ void preprocessSharpenGaussian(Mat *img, int kSize, double sigma)
 
 Mat singleHandWatershed(Mat hand)
 {
-    cout << hand.type() << endl;
     imshow("hand", hand);
     waitKey(0);
 
-
     Mat mask = Mat::zeros(hand.size(), CV_32SC1);
 
-    // set seed points in mask
-    mask.at<int>(mask.rows / 2, mask.cols / 2) = 2;
+    // set seed for hand class segmentation
+    //mask.at<int>(mask.rows / 2, mask.cols / 2) = 2;
+    int xCenter = hand.cols/2, yCenter = hand.rows/2, handSeedW = hand.cols/3, handSeedH = hand.cols/3;
+    rectangle(mask, Rect2i(xCenter - handSeedW/2, yCenter - handSeedH/2, handSeedW, handSeedH), Scalar(2), 1);
 
-    mask.at<int>(0, 0) = 1;
-    mask.at<int>(0, mask.cols - 1) = 1;
-    mask.at<int>(mask.rows - 1, 0) = 1;
-    mask.at<int>(mask.rows - 1, mask.cols - 1) = 1;
+    // set seed for background class
+    rectangle(mask, Rect2i(1,1, mask.cols-2, mask.rows-2), Scalar(1), 1);
 
     // apply watershed
     watershed(hand, mask);
 
     // remove not useful class (2U)
-    //subtract(mask, Mat::ones(mask.size(), mask.type()), mask);
+    subtract(mask, Mat::ones(mask.size(), mask.type()), mask);
 
     // DEBUG: display result
     Vec3b color((uchar)theRNG().uniform(0,127), (uchar)theRNG().uniform(0,127), (uchar)theRNG().uniform(0,127));
     Mat displayImg = hand.clone();
     for (int i = 0; i < hand.rows; i++)
-    {
         for (int j = 0; j < hand.cols; j++)
-        {
-            cout << mask.at<int>(i,j) << endl;
-            if (mask.at<int>(i,j) == 2)
+            if (mask.at<int>(i,j) == 1)
                 displayImg.at<Vec3b>(i,j) = displayImg.at<Vec3b>(i,j)/2 + color;
-        }
-    }
     
     imshow("segmented", displayImg);
     waitKey(0);
@@ -140,8 +133,8 @@ Mat segmentHandsWatershed(HandData data)
         Mat subhand = data.img(Range(bboxStart.y, bboxStart.y + data.bboxes[i].height), Range(bboxStart.x, bboxStart.x + data.bboxes[i].width)).clone();
 
         // preprocessing
-        preprocessSharpenGaussian(&subhand, 5, 10.);
-        preprocessBilateral(&subhand, 10, 10, 600, 7);
+        //preprocessSharpenGaussian(&subhand, 5, 10.);
+        //preprocessBilateral(&subhand, 10, 10, 600, 7);
 
         // finally apply watershed on subimage
         Mat submask = singleHandWatershed(subhand);

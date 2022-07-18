@@ -10,7 +10,7 @@ struct HandData
     std::vector<cv::Rect2i> bboxes;
 };
 
-HandData loadImgAndBboxes(char * imgPath, char * bboxPath);
+HandData loadImgAndBboxes(std::string imgPath, std::string bboxPath);
 
 void showBBoxes(HandData data);
 
