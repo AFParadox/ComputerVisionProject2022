@@ -9,6 +9,9 @@ using namespace std;
 
 void sortNames(vector<string> & names);   // uses bubble sort since it does not need to sort huge arrays
 string getLabelsFilename(string imageFilename, string labelsDirectoryPath);
+void saveAllHandIstancesCropped(vector<string> imgPaths, string yoloOutputDir, string saveDirLocation);
+
+void showWatershed(vector<string> imgPaths, string yoloOutputDir);
 
 int main(int argc, char ** argv) 
 {
@@ -19,11 +22,9 @@ int main(int argc, char ** argv)
     sortNames(imgPaths);
 
     string yoloOutputDir(argv[2]);
-    for (int i = 0; i < imgPaths.size(); i++)
-    {
-        HandData data = loadImgAndBboxes(imgPaths[i], getLabelsFilename(imgPaths[i], string(argv[2])));
-        segmentHandsWatershed(data);
-    }
+    
+    showWatershed(imgPaths, yoloOutputDir);
+    //saveAllHandIstancesCropped(imgPaths, yoloOutputDir, string("../../../Documents/ComputerVision/hand_istances/"));
 }
 
 
@@ -56,9 +57,32 @@ string getLabelsFilename(string imageFilename, string labelsDirectoryPath)
     return labelsDirectoryPath + name + ".txt";
 }
 
+void saveAllHandIstancesCropped(vector<string> imgPaths, string yoloOutputDir, string saveDirLocation)
+{
+    for (int i = 0; i < imgPaths.size(); i++)
+    {
+        // get image name
+        size_t nameBegin = imgPaths[i].find_last_of('/') + 1;
+        size_t nameLenght = imgPaths[i].find_last_of('.', nameBegin) + 1;
+        string name = imgPaths[i].substr(nameBegin, nameLenght);
 
+        // load image
+        HandData data = loadImgAndBboxes(imgPaths[i], getLabelsFilename(imgPaths[i], yoloOutputDir));
 
+        // save hand istances
+        saveHandIstances(name, data, saveDirLocation);
+    }
+}
 
+void showWatershed(vector<string> imgPaths, string yoloOutputDir)
+{
+    for (int i = 0; i < imgPaths.size(); i++)
+    {
+        HandData data = loadImgAndBboxes(imgPaths[i], getLabelsFilename(imgPaths[i], yoloOutputDir));
+        segmentHandsWatershed(data);
+    }
+    
+}
 
 
 
