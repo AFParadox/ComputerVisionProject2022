@@ -21,14 +21,16 @@ void preprocessSharpenGaussian(cv::Mat * img, int kSize, double sigma);    // sh
 void preprocessDrawCannyOnImg(cv::Mat * img, double t1, double t2);
 
 cv::Mat segmentHandsWatershed(HandData data);
-cv::Mat singleHandWatershed(cv::Mat hand);   // return a mask which represent single hand segmentation using watershed method
+cv::Mat singleHandWatershed(cv::Mat origHand, cv::Mat preprocHand);   // return a mask which represent single hand segmentation using watershed method
 bool cmpVec3bs(cv::Vec3b v1, cv:: Vec3b v2, cv::Vec3b thresh);
-void getMarkersWithGraphSegm(cv::Mat hand, cv::Rect2i centralKernel, cv::Mat * markers);
+void setHandMarkersWithGraphSegm(cv::Mat hand, cv::Rect2i centralKernel, cv::Mat * markers);
+void setBackgroundMarkers(cv::Mat img, cv::Mat * markers);
 
 
 
 // below are functions that were useful to using while developing this part of the project
 void showBBoxes(HandData data);
+void showHandPreprocSegm(cv::Mat original, cv::Mat preprocessed, cv::Mat regionsMask);
 void saveHandIstances(std::string name, HandData data, std::string destDir);
 
 #endif // HAND_SEGMENTATION
