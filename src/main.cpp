@@ -1,31 +1,53 @@
 #include <handLocalization.hpp>
 #include <handSegmentation.hpp>
 
+#include <opencv2/highgui.hpp>
+
 #include <iostream>
 #include <string>
 #include <filesystem>
 
 using namespace std;
+using namespace cv;
 
-void sortNames(vector<string> & names);   // uses bubble sort since it does not need to sort huge arrays
-string getLabelsFilename(string imageFilename, string labelsDirectoryPath);
-void saveAllHandIstancesCropped(vector<string> imgPaths, string yoloOutputDir, string saveDirLocation);
+const string datasetPath = "../docs/evaluationDataset/rgb/";
+const string weightsPath = "../yoloWeights.pt";
 
-void showWatershed(vector<string> imgPaths, string yoloOutputDir);
+
+void sortNames(vector<string> & names);   // simple sorting algorithm
+void resultsSlideshow(vector<Mat> imgs, vector<vector<Rect2i>> allDatasetBBoxes, vector<Mat> masks);   // display results nicely
+
+void saveAllHandIstancesCropped(vector<string> imgPaths, string yoloOutputDir, string saveDirLocation);     // save hand instances in sigle files(useful when trying things for segmentation)
+
 
 int main(int argc, char ** argv) 
 {
-    vector<string> imgPaths;
-    for (const auto & entry : filesystem::directory_iterator(argv[1]))
-        imgPaths.push_back(entry.path());
+    // load each image path into vector
+    vector<string> imgsPath;
+    for (const auto & entry : filesystem::directory_iterator(datasetPath))
+        imgsPath.push_back(entry.path());
     
-    sortNames(imgPaths);
+    // sort them
+    sortNames(imgsPath);
 
-    string yoloOutputDir(argv[2]);
+    vector<vector<Rect2i>> allDatasetBBoxes = localizeHands(datasetPath, weightsPath, imgsPath);
+
+    // load images into memory
+    vector<Mat> imgs;
+    for (int i = 0; i < imgsPath.size(); i++)
+        imgs.push_back(imread(imgsPath[i]));
     
-    showWatershed(imgPaths, yoloOutputDir);
-    //saveAllHandIstancesCropped(imgPaths, yoloOutputDir, string("../../../Documents/ComputerVision/hand_istances/"));
+    // segment each image and save the mask
+    vector<Mat> masks;
+    for (int i = 0; i < imgs.size(); i++)
+        masks.push_back( segmentHandsWatershed(imgs[i], allDatasetBBoxes[i]) );
+    
+    resultsSlideshow(imgs, allDatasetBBoxes, masks);
+    
+    exit(EXIT_SUCCESS); // not necessary but why not
 }
+
+
 
 
 void sortNames(vector<string>& names)
@@ -47,15 +69,43 @@ void sortNames(vector<string>& names)
     }
 }
 
-string getLabelsFilename(string imageFilename, string labelsDirectoryPath)
+void resultsSlideshow(vector<Mat> imgs, vector<vector<Rect2i>> allDatasetBBoxes, vector<Mat> masks)
 {
-    size_t nameBegin = imageFilename.find_last_of('/') + 1;
-    size_t nameLenght = imageFilename.find_last_of('.', nameBegin) + 1;
-    
-    string name = imageFilename.substr(nameBegin, nameLenght);
+    system("clear");    // hoping you are using linux :)
 
-    return labelsDirectoryPath + name + ".txt";
+    // print commands
+    cout << "Press 'q' or ESC key to quit (or exit current presentation)" << endl;
+    cout << "Press 'd' to move to next picture "  << endl;
+    cout << "Press 'a' to move to previous picture "  << endl;
+
+    char nxt = 't';
+    int i = 0;
+    Vec3b handColor = Vec3b(0,0,200);   // kind of red
+
+    do
+    {
+        if ((nxt == 'd') && (i < imgs.size()-1))    // go to next image with 'd' key
+            i++;
+        else if ((nxt == 'a') && (i > 0))           // go to previous image with 'a' key
+            i--;
+        else if ((nxt == 'q') || (nxt == 27))       // exit by either pressing ESCAPE key or 'q'
+            break;
+
+        showBBoxes(imgs[i], allDatasetBBoxes[i], i);
+        showSegmentedHands(imgs[i], masks[i], i, handColor);
+
+    } while (nxt = (char)waitKey(0));
 }
+
+
+
+
+
+
+
+
+
+
 
 void saveAllHandIstancesCropped(vector<string> imgPaths, string yoloOutputDir, string saveDirLocation)
 {
@@ -67,26 +117,12 @@ void saveAllHandIstancesCropped(vector<string> imgPaths, string yoloOutputDir, s
         string name = imgPaths[i].substr(nameBegin, nameLenght);
 
         // load image
-        HandData data = loadImgAndBboxes(imgPaths[i], getLabelsFilename(imgPaths[i], yoloOutputDir));
+        //HandData data = loadImgAndBboxes(imgPaths[i], getLabelsFilename(imgPaths[i], yoloOutputDir));
 
         // save hand istances
-        saveHandIstances(name, data, saveDirLocation);
+        //saveHandIstances(name, data, saveDirLocation);
     }
 }
-
-void showWatershed(vector<string> imgPaths, string yoloOutputDir)
-{
-    for (int i = 0; i < imgPaths.size(); i++)
-    {
-        HandData data = loadImgAndBboxes(imgPaths[i], getLabelsFilename(imgPaths[i], yoloOutputDir));
-        segmentHandsWatershed(data);
-    }
-    
-}
-
-
-
-
 
 
 

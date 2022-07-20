@@ -17,50 +17,6 @@ const int centralKernelParam = 10;
 
 
 
-HandData loadImgAndBboxes(string imgPath, string bboxPath)
-{
-    // check if input image exists
-    if (!filesystem::exists(imgPath))
-    {
-        cout << "File \"" << imgPath << "\" does not exists" << endl;
-        exit(EXIT_FAILURE);
-    }
-
-    HandData data;
-
-    // load img
-    data.img = imread(imgPath);
-
-
-    if (filesystem::exists(bboxPath))   // if labels file does not exists means that no hands were detected
-    {
-        // bboxes from file
-        ifstream myFile(bboxPath);
-        int classID;
-        double propX, propY, propW, propH; // prop stands for "proportional" since yolo outputs coordinates are all divided by picure size
-        int x, y, w, h;
-
-        int j = 0;
-        while (myFile >> classID >> propX >> propY >> propW >> propH)
-        {
-            // convert coordinates from yolo notation to classic one
-            w = (int)((double)data.img.cols * propW);
-            h = (int)((double)data.img.rows * propH);
-
-            x = (int)((double)data.img.cols * propX) - w / 2;
-            y = (int)((double)data.img.rows * propY) - h / 2;
-
-            Rect2i r(x, y, w, h);
-            data.bboxes.push_back(r);
-            j++;
-        }
-    }
-    
-
-    return data;
-}
-
-
 void preprocessBilateral(Mat * img, int n, double sigmaColor, double sigmaSpace, int kSize)
 {
     // temp is needed because I don't know if using the same object both in input and output in the bilateral call is safe
@@ -73,6 +29,7 @@ void preprocessBilateral(Mat * img, int n, double sigmaColor, double sigmaSpace,
     }
 }
 
+
 void preprocessSharpenGaussian(Mat *img, int kSize, double sigma)
 {
     Mat gaussImg = Mat::zeros(img->size(), img->type());
@@ -80,6 +37,7 @@ void preprocessSharpenGaussian(Mat *img, int kSize, double sigma)
     GaussianBlur(*img, gaussImg, Size(kSize, kSize), sigma);
     addWeighted(*img, 2., gaussImg, -1., 0, *img);
 }
+
 
 void preprocessDrawCannyOnImg(cv::Mat * img, double t1, double t2)
 {
@@ -99,17 +57,17 @@ void preprocessDrawCannyOnImg(cv::Mat * img, double t1, double t2)
 
 
 
-Mat segmentHandsWatershed(HandData data)
+Mat segmentHandsWatershed(cv::Mat img, std::vector<cv::Rect2i> bboxes)
 {
     // create segmentation mask
-    Mat handsMarkers = Mat::zeros(data.img.size(), CV_8U);
+    Mat handsMarkers = Mat::zeros(img.size(), CV_8U);
 
     // extract hand subimage and clone it in order to not preprocess areas of the original image. Do this using each hand bbox
-    for (int i = 0; i < data.bboxes.size(); i++)
+    for (int i = 0; i < bboxes.size(); i++)
     {
         // crop hand and clone
-        Point bboxStart(data.bboxes[i].x,data.bboxes[i].y);
-        Mat original = data.img(Range(bboxStart.y, bboxStart.y + data.bboxes[i].height), Range(bboxStart.x, bboxStart.x + data.bboxes[i].width));
+        Point bboxStart(bboxes[i].x, bboxes[i].y);
+        Mat original = img(Range(bboxStart.y, bboxStart.y + bboxes[i].height), Range(bboxStart.x, bboxStart.x + bboxes[i].width));
 
         Mat subhand = original.clone();
 
@@ -122,19 +80,19 @@ Mat segmentHandsWatershed(HandData data)
         Mat singleHandMarkers = singleHandWatershed(original, subhand);
 
         // show result
-        showHandPreprocSegm(original, subhand, singleHandMarkers);
+        //showHandPreprocSegm(original, subhand, singleHandMarkers);
 
         // copy submask into full size segmentation mask
-        Mat subMarkers = handsMarkers(Range(bboxStart.y, bboxStart.y + data.bboxes[i].height), Range(bboxStart.x, bboxStart.x + data.bboxes[i].width));
+        Mat subMarkers = handsMarkers(Range(bboxStart.y, bboxStart.y + bboxes[i].height), Range(bboxStart.x, bboxStart.x + bboxes[i].width));
         for (int row = 0; row < subhand.rows; row++)
             for (int col = 0; col < subhand.cols; col++)
                 if (singleHandMarkers.at<int>(row,col) > 0)
                     subMarkers.at<uchar>(row,col) = (uchar)255U;
-        
     }
 
     return handsMarkers;
 }
+
 
 Mat singleHandWatershed(Mat origHand, Mat preprocHand)
 {
@@ -160,6 +118,7 @@ Mat singleHandWatershed(Mat origHand, Mat preprocHand)
     return markers;
 }
 
+
 bool cmpVec3bs(cv::Vec3b v1, cv:: Vec3b v2, cv::Vec3b thresh)
 {
     for (int i = 0; i < 3; i++)
@@ -167,6 +126,7 @@ bool cmpVec3bs(cv::Vec3b v1, cv:: Vec3b v2, cv::Vec3b thresh)
             return false;
     return true;
 }
+
 
 void setHandMarkersWithGraphSegm(Mat hand, Rect2i centralKernel, Mat * markers)
 {
@@ -201,9 +161,15 @@ void setHandMarkersWithGraphSegm(Mat hand, Rect2i centralKernel, Mat * markers)
     }
 }
 
+
 void setBackgroundMarkers(Mat img, Mat * markers)
 {
+    // The first line is the most basic setup of the background markers
     //rectangle(*markers, Rect2i(1,1, markers->cols-2, markers->rows-2), Scalar(1), 1, LINE_4);
+
+    // This part is commented out because it's result wasn't really good
+    // ************************************************************************************************************************************************************
+    // Compute mean and standart deviation of central kernel region and use them to prevent portion of the hand to be included into the background markers
 
     // now we need to remove from the background seeds those points which belong to the person arm(if wearing a t-shirt can be an issue)
     // to begin we compute mean and std dev of the center seed
@@ -222,12 +188,12 @@ void setBackgroundMarkers(Mat img, Mat * markers)
     //Vec3b mean(meanScalar[0], meanScalar[1], meanScalar[2]);
     //Vec3b stdDev(stdDevScalar[0], stdDevScalar[1], stdDevScalar[2]);
 
-    //Vec3b mean(63, 73, 115);
-    Vec3b mean(54, 87, 133);
-    Vec3b stdDev(5, 5, 5);
+    // ************************************************************************************************************************************************************
 
-    //double maxDistThresh = norm(stdDevScalar, NORM_L2) / 2.;
-    //cout << "mean: " << mean << "   stdDev" << stdDev << endl;
+    // mean and stdDev have these names because of the previous ad above attempt of using actual mean and stdDev.
+    //Vec3b mean(63, 73, 115);
+    Vec3b mean(54, 87, 133);    // this really is skin color
+    Vec3b stdDev(5, 5, 5);      // this really is a threshold to use in comparisons
 
     // check in each backgorund seed point if the values are between the thresholds, and, if that is the case, remove those seed points(aka arm/wrist skin)
     // done along the bounding box edges, 4 edges
@@ -249,18 +215,24 @@ void setBackgroundMarkers(Mat img, Mat * markers)
 }
 
 
-
-
-
-
-void showBBoxes(HandData data)
+void showSegmentedHands(Mat img, Mat mask, int imgNum, Vec3b regionColor)
 {
-    Mat img = data.img.clone();
-    for (int i = 0; i < data.bboxes.size(); i++)
-        rectangle(img, data.bboxes[i], Scalar(0,0,255), 2);
-    imshow("img", img);
-    waitKey(0);
+    regionColor /= 2;   // in order to not overflow the color
+
+    // color the image on the segmented area
+    Mat segmented = img.clone();
+    for (int row = 0; row < img.rows; row++)
+        for (int col = 0; col < img.cols; col++)
+            if (mask.at<uchar>(row,col) == (uchar)255U)
+                segmented.at<Vec3b>(row,col) = segmented.at<Vec3b>(row,col)/2 + regionColor;
+    
+    // show image with segmented hands and rename window according number(helps viewing)
+    imshow("segmentationDisplay", segmented);
+    setWindowTitle("segmentationDisplay", "Segmentation Result: image n° " + to_string(imgNum));
 }
+
+
+
 
 void showHandPreprocSegm(Mat original, Mat preprocessed, Mat regionsMask)
 {
@@ -279,7 +251,10 @@ void showHandPreprocSegm(Mat original, Mat preprocessed, Mat regionsMask)
     rectangle(segmented, Rect2i(xCenter - handSeedW/2, yCenter - handSeedH/2, handSeedW, handSeedH), Scalar((uchar)0,(uchar)0,(uchar)255), 1, LINE_4);
     //rectangle(segmented, Rect2i(1,1, regionsMask.cols-2, regionsMask.rows-2), Scalar((uchar)0,(uchar)255,(uchar)0), 1, LINE_4);
 
-    // **************************************************************************************
+    // This part is commented out because it's result wasn't really good
+    // ************************************************************************************************************************************************************
+    // Compute mean and standart deviation of central kernel region and use them to prevent portion of the hand to be included into the background markers
+
     //Scalar meanScalar, stdDevScalar;
     //Mat handCenterValues = original(Range(yCenter - handSeedH/2, yCenter + handSeedH/2), Range(xCenter - handSeedW/2, xCenter + handSeedW/2));
 
@@ -291,10 +266,14 @@ void showHandPreprocSegm(Mat original, Mat preprocessed, Mat regionsMask)
     // set mean vector and find maximum distance from it as the L2 norm of the stdDevScalar vector
     //Vec3b mean(meanScalar[0], meanScalar[1], meanScalar[2]);
 
-    //Vec3b mean(63, 73, 115);
-    Vec3b mean(54, 87, 133);
-    Vec3b stdDev(5, 5, 5);
+    // ************************************************************************************************************************************************************
 
+    // mean and stdDev have these names because of the previous ad above attempt of using actual mean and stdDev.
+    //Vec3b mean(63, 73, 115);
+    Vec3b mean(54, 87, 133);    // this really is skin color
+    Vec3b stdDev(5, 5, 5);      // this really is a threshold to use in comparisons
+
+    // move along bbox edges and draw in green background markers
     for (int i = 1; i < original.cols-1; i++)   // top edge
         if (cmpVec3bs(mean, original.at<Vec3b>(1,i), stdDev))
             segmented.at<Vec3b>(1,i) = Vec3b((uchar)0, (uchar)255, (uchar)0);
@@ -310,7 +289,6 @@ void showHandPreprocSegm(Mat original, Mat preprocessed, Mat regionsMask)
     for (int i = 1; i < original.rows-1; i++)   // right edge
         if (cmpVec3bs(mean, original.at<Vec3b>(i,original.cols-2), stdDev))
             segmented.at<Vec3b>(i,original.cols-2) = Vec3b((uchar)0, (uchar)255, (uchar)0);
-    // **************************************************************************************
 
     imshow("original", original);
     imshow("preprocessed", preprocessed);
@@ -321,16 +299,17 @@ void showHandPreprocSegm(Mat original, Mat preprocessed, Mat regionsMask)
         exit(EXIT_SUCCESS);
 }
 
-void saveHandIstances(std::string name, HandData data, std::string destDir)
+
+void saveHandIstances(std::string name, cv::Mat img, std::vector<cv::Rect2i> bboxes, std::string destDir)
 {
-    for (int i = 0; i < data.bboxes.size(); i++)
+    for (int i = 0; i < bboxes.size(); i++)
     {
         // generate filename
         string handImgSaveLocation = destDir + name + "_" + to_string(i) + ".jpg";
 
         // crop hand
-        Point bboxStart(data.bboxes[i].x,data.bboxes[i].y);
-        Mat hand = data.img(Range(bboxStart.y, bboxStart.y + data.bboxes[i].height), Range(bboxStart.x, bboxStart.x + data.bboxes[i].width));
+        Point bboxStart(bboxes[i].x, bboxes[i].y);
+        Mat hand = img(Range(bboxStart.y, bboxStart.y + bboxes[i].height), Range(bboxStart.x, bboxStart.x + bboxes[i].width));
 
         // save hand
         imwrite(handImgSaveLocation, hand);
