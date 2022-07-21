@@ -15,12 +15,12 @@ const string weightsPath = "../yoloWeights.pt";
 
 
 void sortNames(vector<string> & names);   // simple sorting algorithm
-void resultsSlideshow(vector<Mat> imgs, vector<vector<Rect2i>> allDatasetBBoxes, vector<Mat> masks);   // display results nicely
+void resultsSlideshow(vector<Mat> imgs, vector<vector<Rect>> allDatasetBBoxes, vector<Mat> masks);   // display results nicely
 
 void saveAllHandIstancesCropped(vector<string> imgPaths, string yoloOutputDir, string saveDirLocation);     // save hand instances in sigle files(useful when trying things for segmentation)
 
-
-int main(int argc, char ** argv) 
+// call python yolov5 (UGLY)
+/*int main(int argc, char ** argv) 
 {
     // load each image path into vector
     vector<string> imgsPath;
@@ -30,7 +30,7 @@ int main(int argc, char ** argv)
     // sort them
     sortNames(imgsPath);
 
-    vector<vector<Rect2i>> allDatasetBBoxes = localizeHands(datasetPath, weightsPath, imgsPath);
+    vector<vector<Rect>> allDatasetBBoxes = localizeHands(datasetPath, weightsPath, imgsPath);
 
     // load images into memory
     vector<Mat> imgs;
@@ -45,8 +45,46 @@ int main(int argc, char ** argv)
     resultsSlideshow(imgs, allDatasetBBoxes, masks);
     
     exit(EXIT_SUCCESS); // not necessary but why not
-}
+}*/
 
+// yolov5 model imported and used by opecv (BEAUTIFUL)
+int main(int argc, char ** argv) 
+{
+    // load each image path into vector
+    vector<string> imgsPath;
+    for (const auto & entry : filesystem::directory_iterator(datasetPath))
+        imgsPath.push_back(entry.path());
+    
+    // sort them
+    sortNames(imgsPath);
+
+    // load images into memory
+    vector<Mat> imgs;
+    for (int i = 0; i < imgsPath.size(); i++)
+        imgs.push_back(imread(imgsPath[i]));
+
+    vector<vector<Rect>> allDatasetBBoxes;
+    for (int i = 0; i < imgsPath.size(); i++)
+    {
+        Mat temp = imgs[i].clone();
+        cout << "img n° " << to_string(i) << "  START" << endl;
+        vector<Rect> tempBB = localizeHands_opencvNN(temp);
+        allDatasetBBoxes.push_back( tempBB );
+        cout << allDatasetBBoxes[i].size() << endl;
+        cout << "img n° " << to_string(i) << "  END" << endl << endl;
+    }    
+    
+    cout << "COSO   " << imgs.size() << endl;
+
+    // segment each image and save the mask
+    vector<Mat> masks;
+    for (int i = 0; i < imgs.size(); i++)
+        masks.push_back( segmentHandsWatershed(imgs[i], allDatasetBBoxes[i]) );
+    
+    resultsSlideshow(imgs, allDatasetBBoxes, masks);
+    
+    exit(EXIT_SUCCESS); // not necessary but why not
+}
 
 
 
@@ -69,7 +107,7 @@ void sortNames(vector<string>& names)
     }
 }
 
-void resultsSlideshow(vector<Mat> imgs, vector<vector<Rect2i>> allDatasetBBoxes, vector<Mat> masks)
+void resultsSlideshow(vector<Mat> imgs, vector<vector<Rect>> allDatasetBBoxes, vector<Mat> masks)
 {
     system("clear");    // hoping you are using linux :)
 

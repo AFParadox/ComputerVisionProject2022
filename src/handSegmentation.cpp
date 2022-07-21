@@ -57,7 +57,7 @@ void preprocessDrawCannyOnImg(cv::Mat * img, double t1, double t2)
 
 
 
-Mat segmentHandsWatershed(cv::Mat img, std::vector<cv::Rect2i> bboxes)
+Mat segmentHandsWatershed(cv::Mat img, std::vector<cv::Rect> bboxes)
 {
     // create segmentation mask
     Mat handsMarkers = Mat::zeros(img.size(), CV_8U);
@@ -101,10 +101,10 @@ Mat singleHandWatershed(Mat origHand, Mat preprocHand)
     // set seed for hand class segmentation
     int xCenter = origHand.cols / 2, yCenter = origHand.rows / 2;
     int handSeedW = origHand.cols / centralKernelParam, handSeedH = origHand.rows / centralKernelParam;
-    //rectangle(mask, Rect2i(xCenter - handSeedW/2, yCenter - handSeedH/2, handSeedW, handSeedH), Scalar(2), 1, LINE_4);
+    //rectangle(mask, Rect(xCenter - handSeedW/2, yCenter - handSeedH/2, handSeedW, handSeedH), Scalar(2), 1, LINE_4);
 
     // set markers for hand using graph segmentation
-    setHandMarkersWithGraphSegm(preprocHand, Rect2i(xCenter - handSeedW/2, yCenter - handSeedH/2, handSeedW, handSeedH), &markers);
+    setHandMarkersWithGraphSegm(preprocHand, Rect(xCenter - handSeedW/2, yCenter - handSeedH/2, handSeedW, handSeedH), &markers);
 
     // set seed for background class
     setBackgroundMarkers(origHand, &markers);
@@ -128,7 +128,7 @@ bool cmpVec3bs(cv::Vec3b v1, cv:: Vec3b v2, cv::Vec3b thresh)
 }
 
 
-void setHandMarkersWithGraphSegm(Mat hand, Rect2i centralKernel, Mat * markers)
+void setHandMarkersWithGraphSegm(Mat hand, Rect centralKernel, Mat * markers)
 {
     // do graph segmentation
     Ptr<ximgproc::segmentation::GraphSegmentation> segmentor = ximgproc::segmentation::createGraphSegmentation(0.6, 100, 200);
@@ -165,7 +165,7 @@ void setHandMarkersWithGraphSegm(Mat hand, Rect2i centralKernel, Mat * markers)
 void setBackgroundMarkers(Mat img, Mat * markers)
 {
     // The first line is the most basic setup of the background markers
-    //rectangle(*markers, Rect2i(1,1, markers->cols-2, markers->rows-2), Scalar(1), 1, LINE_4);
+    //rectangle(*markers, Rect(1,1, markers->cols-2, markers->rows-2), Scalar(1), 1, LINE_4);
 
     // This part is commented out because it's result wasn't really good
     // ************************************************************************************************************************************************************
@@ -248,8 +248,8 @@ void showHandPreprocSegm(Mat original, Mat preprocessed, Mat regionsMask)
     int xCenter = original.cols / 2, yCenter = original.rows / 2;
     int handSeedW = original.cols / centralKernelParam, handSeedH = original.rows / centralKernelParam;
 
-    rectangle(segmented, Rect2i(xCenter - handSeedW/2, yCenter - handSeedH/2, handSeedW, handSeedH), Scalar((uchar)0,(uchar)0,(uchar)255), 1, LINE_4);
-    //rectangle(segmented, Rect2i(1,1, regionsMask.cols-2, regionsMask.rows-2), Scalar((uchar)0,(uchar)255,(uchar)0), 1, LINE_4);
+    rectangle(segmented, Rect(xCenter - handSeedW/2, yCenter - handSeedH/2, handSeedW, handSeedH), Scalar((uchar)0,(uchar)0,(uchar)255), 1, LINE_4);
+    //rectangle(segmented, Rect(1,1, regionsMask.cols-2, regionsMask.rows-2), Scalar((uchar)0,(uchar)255,(uchar)0), 1, LINE_4);
 
     // This part is commented out because it's result wasn't really good
     // ************************************************************************************************************************************************************
@@ -300,7 +300,7 @@ void showHandPreprocSegm(Mat original, Mat preprocessed, Mat regionsMask)
 }
 
 
-void saveHandIstances(std::string name, cv::Mat img, std::vector<cv::Rect2i> bboxes, std::string destDir)
+void saveHandIstances(std::string name, cv::Mat img, std::vector<cv::Rect> bboxes, std::string destDir)
 {
     for (int i = 0; i < bboxes.size(); i++)
     {

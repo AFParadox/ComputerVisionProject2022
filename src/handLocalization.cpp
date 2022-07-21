@@ -2,6 +2,7 @@
 
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/dnn.hpp>
 
 #include <filesystem>
 #include <string>
@@ -10,17 +11,28 @@
 
 using namespace std;
 using namespace cv;
+using namespace cv::dnn;
 
 const string yoloPath = "../src/yolov5/";
 const string yoloLabelsDirPath = "../src/yolov5/runs/detect/hand_det/labels/";
 
+const string nnWeights = "../bestM.onnx";
 
-vector<vector<Rect2i>> localizeHands(string datasetPath, string weightsPath, vector<string> imgsPath)
+const float INPUT_WIDTH = 640.0;
+const float INPUT_HEIGHT = 640.0;
+const float SCORE_THRESHOLD = 0.5;
+const float NMS_THRESHOLD = 0.45;
+const float CONFIDENCE_THRESHOLD = 0.45;
+
+Scalar RED = Scalar(0,0,255);
+
+
+vector<vector<Rect>> localizeHands(string datasetPath, string weightsPath, vector<string> imgsPath)
 {
     // run yolo detect.py
     runYoloDetection(datasetPath, weightsPath);
 
-    vector<vector<Rect2i>> allDatasetBBoxes;
+    vector<vector<Rect>> allDatasetBBoxes;
     for (int i = 0; i < imgsPath.size(); i++)
     {
         Mat img = imread(imgsPath[i]);  // load img just to get width and height
@@ -61,9 +73,9 @@ string getLabelsName(string imageFilename)
 }
 
 
-vector<Rect2i> loadFromYolo(string yoloLabelsPath, double imgHeight, double imgWidth)
+vector<Rect> loadFromYolo(string yoloLabelsPath, double imgHeight, double imgWidth)
 {
-    vector<Rect2i> bboxes;
+    vector<Rect> bboxes;
 
     if (filesystem::exists(yoloLabelsPath))   // if labels file does not exists means that no hands were detected
     {
@@ -83,7 +95,7 @@ vector<Rect2i> loadFromYolo(string yoloLabelsPath, double imgHeight, double imgW
             x = (int)(imgWidth * propX) - w / 2;
             y = (int)(imgHeight * propY) - h / 2;
 
-            Rect2i r(x, y, w, h);
+            Rect r(x, y, w, h);
             bboxes.push_back(r);
             j++;
         }
@@ -93,7 +105,7 @@ vector<Rect2i> loadFromYolo(string yoloLabelsPath, double imgHeight, double imgW
 }
 
 
-void saveLabels2PtNotation(vector<string> imgsPath, string saveDir, vector<vector<Rect2i>> allDatasetBBoxes)
+void saveLabels2PtNotation(vector<string> imgsPath, string saveDir, vector<vector<Rect>> allDatasetBBoxes)
 {
     for (int i = 0; i < imgsPath.size(); i++)
     {
@@ -115,7 +127,7 @@ void saveLabels2PtNotation(vector<string> imgsPath, string saveDir, vector<vecto
     }
 }
 
-void showBBoxes(Mat img, vector<Rect2i> bboxes, int imgNum)
+void showBBoxes(Mat img, vector<Rect> bboxes, int imgNum)
 {
     Mat displayImg = img.clone();
     for (int i = 0; i < bboxes.size(); i++)
@@ -127,3 +139,116 @@ void showBBoxes(Mat img, vector<Rect2i> bboxes, int imgNum)
 }
 
 
+
+
+
+
+// reshape the image into one which is (on smaller istances) bigger and square. Image is not stretched but gray bands are added to fill the gaps
+Mat letterbox(Mat &img, Size new_shape, Scalar color, bool _auto, bool scaleFill, bool scaleup, int stride)     // https://github.com/Hexmagic/ONNX-yolov5
+{
+    float width = img.cols;
+    float height = img.rows;
+    float r = min(new_shape.width / width, new_shape.height / height);
+    if (!scaleup)
+        r = min(r, 1.0f);
+    int new_unpadW = int(round(width * r));
+    int new_unpadH = int(round(height * r));
+    int dw = new_shape.width - new_unpadW;
+    int dh = new_shape.height - new_unpadH;
+    if (_auto)
+    {
+        dw %= stride;
+        dh %= stride;
+    }
+    dw /= 2, dh /= 2;
+    Mat dst;
+    resize(img, dst, Size(new_unpadW, new_unpadH), 0, 0, INTER_LINEAR);
+    int top = int(round(dh - 0.1));
+    int bottom = int(round(dh + 0.1));
+    int left = int(round(dw - 0.1));
+    int right = int(round(dw + 0.1));
+    cv::copyMakeBorder(dst, dst, top, bottom, left, right, BORDER_CONSTANT, color); // NAMESPACE NEEDED TO AVOID AMBIGUITY
+    return dst;
+}
+
+vector<Rect> localizeHands_opencvNN(Mat &img)     // https://github.com/spmallick/learnopencv/tree/master/Object-Detection-using-YOLOv5-and-OpenCV-DNN-in-CPP-and-Python
+{
+    // Load model.
+    Net net;
+    net = readNet(nnWeights);
+
+    // not sure if the input need to be agumented with letterbox...
+    //input_image = letterbox(input_image, Size(640, 640), Scalar(114, 114, 114), false, false, true, 32);
+
+    // Convert to blob.
+    Mat blob;
+    blobFromImage(img, blob, 1./255., Size(INPUT_WIDTH, INPUT_HEIGHT), Scalar(), true, false);
+
+    net.setInput(blob);
+
+    // Forward propagate.
+    vector<Mat> detections;
+    net.forward(detections, net.getUnconnectedOutLayersNames());
+
+    Mat imgCopy = img.clone();
+
+    // Initialize vectors to hold respective outputs while unwrapping detections.
+    vector<float> confidences;
+    vector<Rect> boxes; 
+
+    // Resizing factor.
+    float x_factor = imgCopy.cols / INPUT_WIDTH;
+    float y_factor = imgCopy.rows / INPUT_HEIGHT;
+
+    float *data = (float *)detections[0].data;
+
+    const int dimensions = 6;   // 5 + class number
+    const int rows = 25200;     // for some reason net output always looks like this
+
+    // Iterate through 25200 detections.
+    for (int i = 0; i < rows; ++i) 
+    {
+        float confidence = data[4];
+        // Discard bad detections and continue.
+        if (confidence >= CONFIDENCE_THRESHOLD) 
+        { 
+            float hand_score = data[5];
+            // Continue if the class score is above the threshold.
+            if (hand_score > SCORE_THRESHOLD) 
+            {
+                // Store  confidence in the pre-defined respective vectors.
+                confidences.push_back(confidence);
+
+                // Center. yolo notation
+                float cx = data[0];
+                float cy = data[1];
+                // Box dimension. yolo notation
+                float w = data[2];
+                float h = data[3];
+
+                // Bounding box coordinates. Convert from yolo notation
+                int left = int((cx - 0.5 * w) * x_factor);
+                int top = int((cy - 0.5 * h) * y_factor);
+                int width = int(w * x_factor);
+                int height = int(h * y_factor);
+
+                // Store good detections in the boxes vector.
+                boxes.push_back(Rect(left, top, width, height));
+            }
+
+        }
+        // Jump to the next column.
+        data += dimensions;
+    }
+
+    // Perform Non Maximum Suppression and draw predictions.
+    vector<int> indices;
+    NMSBoxes(boxes, confidences, SCORE_THRESHOLD, NMS_THRESHOLD, indices);
+
+    // Select right bboxes
+    vector<Rect> resultingBBoxes;
+    for (int i = 0; i < indices.size(); i++)
+        resultingBBoxes.push_back(boxes[indices[i]]);
+
+    return resultingBBoxes;
+}

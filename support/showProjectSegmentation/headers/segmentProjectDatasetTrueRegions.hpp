@@ -8,7 +8,7 @@ class segmentProjectDatasetTrueRegions
 private:
     bool imgsLoaded, handBoxesLoaded, trueMasksLoaded;
     std::vector<cv::Mat> imgs, trueMasks;
-    std::vector<std::vector<cv::Rect2i>> handBoxes;
+    std::vector<std::vector<cv::Rect>> handBoxes;
     void printCommands();
 public:
     segmentProjectDatasetTrueRegions();

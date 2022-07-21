@@ -84,7 +84,7 @@ int segmentProjectDatasetTrueRegions::loadHandBoxesCoordsWithGlob(char *pattern)
         int j = 0;
         while (myFile >> x >> y >> w >> h)
         {
-            Rect2i r(x, y, w, h);
+            Rect r(x, y, w, h);
             handBoxes[i].push_back(r);
             j++;
         }
