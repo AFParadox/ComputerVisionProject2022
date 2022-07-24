@@ -24,7 +24,7 @@ const float SCORE_THRESHOLD = 0.5;
 const float NMS_THRESHOLD = 0.45;
 const float CONFIDENCE_THRESHOLD = 0.45;
 
-Scalar RED = Scalar(0,0,255);
+const Scalar RED = Scalar(0,0,255);
 
 
 vector<vector<Rect>> localizeHands(string datasetPath, string weightsPath, vector<string> imgsPath)
@@ -143,33 +143,7 @@ void showBBoxes(Mat img, vector<Rect> bboxes, int imgNum)
 
 
 
-// reshape the image into one which is (on smaller istances) bigger and square. Image is not stretched but gray bands are added to fill the gaps
-Mat letterbox(Mat &img, Size new_shape, Scalar color, bool _auto, bool scaleFill, bool scaleup, int stride)     // https://github.com/Hexmagic/ONNX-yolov5
-{
-    float width = img.cols;
-    float height = img.rows;
-    float r = min(new_shape.width / width, new_shape.height / height);
-    if (!scaleup)
-        r = min(r, 1.0f);
-    int new_unpadW = int(round(width * r));
-    int new_unpadH = int(round(height * r));
-    int dw = new_shape.width - new_unpadW;
-    int dh = new_shape.height - new_unpadH;
-    if (_auto)
-    {
-        dw %= stride;
-        dh %= stride;
-    }
-    dw /= 2, dh /= 2;
-    Mat dst;
-    resize(img, dst, Size(new_unpadW, new_unpadH), 0, 0, INTER_LINEAR);
-    int top = int(round(dh - 0.1));
-    int bottom = int(round(dh + 0.1));
-    int left = int(round(dw - 0.1));
-    int right = int(round(dw + 0.1));
-    cv::copyMakeBorder(dst, dst, top, bottom, left, right, BORDER_CONSTANT, color); // NAMESPACE NEEDED TO AVOID AMBIGUITY
-    return dst;
-}
+
 
 vector<Rect> localizeHands_opencvNN(Mat &img)     // https://github.com/spmallick/learnopencv/tree/master/Object-Detection-using-YOLOv5-and-OpenCV-DNN-in-CPP-and-Python
 {
@@ -178,11 +152,11 @@ vector<Rect> localizeHands_opencvNN(Mat &img)     // https://github.com/spmallic
     net = readNet(nnWeights);
 
     // not sure if the input need to be agumented with letterbox...
-    //input_image = letterbox(input_image, Size(640, 640), Scalar(114, 114, 114), false, false, true, 32);
+    Mat yoloResizedImg = letterbox(img, Size(640, 640), Scalar(114, 114, 114), false, false, true, 32);
 
     // Convert to blob.
     Mat blob;
-    blobFromImage(img, blob, 1./255., Size(INPUT_WIDTH, INPUT_HEIGHT), Scalar(), true, false);
+    blobFromImage(yoloResizedImg, blob, 1./255., Size(INPUT_WIDTH, INPUT_HEIGHT), Scalar(), true, false);
 
     net.setInput(blob);
 
@@ -190,15 +164,13 @@ vector<Rect> localizeHands_opencvNN(Mat &img)     // https://github.com/spmallic
     vector<Mat> detections;
     net.forward(detections, net.getUnconnectedOutLayersNames());
 
-    Mat imgCopy = img.clone();
-
     // Initialize vectors to hold respective outputs while unwrapping detections.
     vector<float> confidences;
     vector<Rect> boxes; 
 
     // Resizing factor.
-    float x_factor = imgCopy.cols / INPUT_WIDTH;
-    float y_factor = imgCopy.rows / INPUT_HEIGHT;
+    float x_factor = yoloResizedImg.cols / INPUT_WIDTH;
+    float y_factor = yoloResizedImg.rows / INPUT_HEIGHT;
 
     float *data = (float *)detections[0].data;
 
@@ -248,7 +220,84 @@ vector<Rect> localizeHands_opencvNN(Mat &img)     // https://github.com/spmallic
     // Select right bboxes
     vector<Rect> resultingBBoxes;
     for (int i = 0; i < indices.size(); i++)
+    {
+        convertLetterboxCoords(boxes[indices[i]], img);  // convert bboxes coords
         resultingBBoxes.push_back(boxes[indices[i]]);
+    }
 
     return resultingBBoxes;
+}
+
+
+// reshape the image into one which is (on smaller istances) bigger and square. Image is not stretched but gray bands are added to fill the gaps
+Mat letterbox(Mat &img, Size new_shape, Scalar color, bool _auto, bool scaleFill, bool scaleup, int stride)     // https://github.com/Hexmagic/ONNX-yolov5
+{
+    float width = img.cols;
+    float height = img.rows;
+    float r = min(new_shape.width / width, new_shape.height / height);
+    if (!scaleup)
+        r = min(r, 1.0f);
+    int new_unpadW = int(round(width * r));
+    int new_unpadH = int(round(height * r));
+    int dw = new_shape.width - new_unpadW;
+    int dh = new_shape.height - new_unpadH;
+    if (_auto)
+    {
+        dw %= stride;
+        dh %= stride;
+    }
+    dw /= 2, dh /= 2;
+    Mat dst;
+    resize(img, dst, Size(new_unpadW, new_unpadH), 0, 0, INTER_LINEAR);
+    int top = int(round(dh - 0.1));
+    int bottom = int(round(dh + 0.1));
+    int left = int(round(dw - 0.1));
+    int right = int(round(dw + 0.1));
+    cv::copyMakeBorder(dst, dst, top, bottom, left, right, BORDER_CONSTANT, color); // NAMESPACE NEEDED TO AVOID AMBIGUITY
+    return dst;
+}
+
+
+void convertLetterboxCoords(cv::Rect &bbox, cv::Mat &img)
+{
+    // find translate bbox rect spacial coords. New coords apply on img without padding
+    float imgWidth = (float)img.cols, imgHeight = (float)img.rows;
+    float scaleRatio = 0.F, padding = 0.F, smallSideSize = 0.F;
+    float xPrime = 0.F, yPrime = 0.F;
+
+    float imgAspectRatio = imgWidth / imgHeight;
+    float dnnInputAspectRatio = INPUT_WIDTH / INPUT_HEIGHT;
+
+    if (imgAspectRatio >= dnnInputAspectRatio)
+    {
+        scaleRatio = imgWidth / INPUT_WIDTH;
+        smallSideSize = imgHeight / scaleRatio; // big side size is equal to INPUT_WIDTH
+        padding = (INPUT_HEIGHT - smallSideSize) / 2.F;
+
+        xPrime = (float)bbox.x;
+        yPrime = (float)bbox.y - padding;
+    }
+    else
+    {
+        scaleRatio = imgHeight / INPUT_HEIGHT;
+        smallSideSize = imgWidth / scaleRatio; // big side size is equal to INPUT_WIDTH
+        padding = (INPUT_WIDTH - smallSideSize) / 2.F;
+
+        xPrime = (float)bbox.x - padding;
+        yPrime = (float)bbox.y;
+    }
+    
+    // now to compute correct bbox coords
+    bbox.x = (int)round((double)(xPrime * scaleRatio));
+    bbox.y = (int)round((double)(yPrime * scaleRatio));
+    
+    // compute bbox height and width
+    bbox.width = (int)round((double)bbox.width * (double)scaleRatio);
+    bbox.height = (int)round((double)bbox.height * (double)scaleRatio);
+
+    // check if bbox fit within image
+    if (img.cols - bbox.x - bbox.width <= 0)
+        bbox.width = img.cols - bbox.x - 1;
+    if (img.rows - bbox.y - bbox.height <= 0)
+        bbox.height = img.rows - bbox.y - 1;
 }

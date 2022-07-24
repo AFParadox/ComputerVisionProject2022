@@ -19,35 +19,7 @@ void resultsSlideshow(vector<Mat> imgs, vector<vector<Rect>> allDatasetBBoxes, v
 
 void saveAllHandIstancesCropped(vector<string> imgPaths, string yoloOutputDir, string saveDirLocation);     // save hand instances in sigle files(useful when trying things for segmentation)
 
-// call python yolov5 (UGLY)
-/*int main(int argc, char ** argv) 
-{
-    // load each image path into vector
-    vector<string> imgsPath;
-    for (const auto & entry : filesystem::directory_iterator(datasetPath))
-        imgsPath.push_back(entry.path());
-    
-    // sort them
-    sortNames(imgsPath);
 
-    vector<vector<Rect>> allDatasetBBoxes = localizeHands(datasetPath, weightsPath, imgsPath);
-
-    // load images into memory
-    vector<Mat> imgs;
-    for (int i = 0; i < imgsPath.size(); i++)
-        imgs.push_back(imread(imgsPath[i]));
-    
-    // segment each image and save the mask
-    vector<Mat> masks;
-    for (int i = 0; i < imgs.size(); i++)
-        masks.push_back( segmentHandsWatershed(imgs[i], allDatasetBBoxes[i]) );
-    
-    resultsSlideshow(imgs, allDatasetBBoxes, masks);
-    
-    exit(EXIT_SUCCESS); // not necessary but why not
-}*/
-
-// yolov5 model imported and used by opecv (BEAUTIFUL)
 int main(int argc, char ** argv) 
 {
     // load each image path into vector
@@ -63,26 +35,35 @@ int main(int argc, char ** argv)
     for (int i = 0; i < imgsPath.size(); i++)
         imgs.push_back(imread(imgsPath[i]));
 
-    vector<vector<Rect>> allDatasetBBoxes;
-    for (int i = 0; i < imgsPath.size(); i++)
-    {
-        Mat temp = imgs[i].clone();
-        cout << "img n° " << to_string(i) << "  START" << endl;
-        vector<Rect> tempBB = localizeHands_opencvNN(temp);
-        allDatasetBBoxes.push_back( tempBB );
-        cout << allDatasetBBoxes[i].size() << endl;
-        cout << "img n° " << to_string(i) << "  END" << endl << endl;
-    }    
-    
-    cout << "COSO   " << imgs.size() << endl;
 
-    // segment each image and save the mask
-    vector<Mat> masks;
-    for (int i = 0; i < imgs.size(); i++)
-        masks.push_back( segmentHandsWatershed(imgs[i], allDatasetBBoxes[i]) );
-    
-    resultsSlideshow(imgs, allDatasetBBoxes, masks);
-    
+    system("clear");    // hoping you are using linux :)
+
+    // print commands
+    cout << "Press 'q' or ESC key to quit (or exit current presentation)" << endl;
+    cout << "Press 'd' to move to next picture "  << endl;
+    cout << "Press 'a' to move to previous picture "  << endl;
+
+    char nxt = 't';
+    int i = 0;
+    Vec3b handColor = Vec3b(0,0,200);   // kind of red
+
+    do
+    {
+        if ((nxt == 'd') && (i < imgs.size()-1))    // go to next image with 'd' key
+            i++;
+        else if ((nxt == 'a') && (i > 0))           // go to previous image with 'a' key
+            i--;
+        else if ((nxt == 'q') || (nxt == 27))       // exit by either pressing ESCAPE key or 'q'
+            break;
+
+        vector<Rect> bboxes = localizeHands_opencvNN(imgs[i]);
+        Mat mask = segmentHandsWatershed(imgs[i], bboxes);
+
+        showBBoxes(imgs[i], bboxes, i);
+        showSegmentedHands(imgs[i], mask, i, handColor);
+
+    } while (nxt = (char)waitKey(0));
+
     exit(EXIT_SUCCESS); // not necessary but why not
 }
 
@@ -106,43 +87,6 @@ void sortNames(vector<string>& names)
         if (!iteration) break;
     }
 }
-
-void resultsSlideshow(vector<Mat> imgs, vector<vector<Rect>> allDatasetBBoxes, vector<Mat> masks)
-{
-    system("clear");    // hoping you are using linux :)
-
-    // print commands
-    cout << "Press 'q' or ESC key to quit (or exit current presentation)" << endl;
-    cout << "Press 'd' to move to next picture "  << endl;
-    cout << "Press 'a' to move to previous picture "  << endl;
-
-    char nxt = 't';
-    int i = 0;
-    Vec3b handColor = Vec3b(0,0,200);   // kind of red
-
-    do
-    {
-        if ((nxt == 'd') && (i < imgs.size()-1))    // go to next image with 'd' key
-            i++;
-        else if ((nxt == 'a') && (i > 0))           // go to previous image with 'a' key
-            i--;
-        else if ((nxt == 'q') || (nxt == 27))       // exit by either pressing ESCAPE key or 'q'
-            break;
-
-        showBBoxes(imgs[i], allDatasetBBoxes[i], i);
-        showSegmentedHands(imgs[i], masks[i], i, handColor);
-
-    } while (nxt = (char)waitKey(0));
-}
-
-
-
-
-
-
-
-
-
 
 
 void saveAllHandIstancesCropped(vector<string> imgPaths, string yoloOutputDir, string saveDirLocation)

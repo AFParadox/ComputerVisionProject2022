@@ -13,6 +13,7 @@ std::vector<cv::Rect> loadFromYolo(std::string yoloLabelsPath, double imgHeight,
 
 std::vector<cv::Rect> localizeHands_opencvNN(cv::Mat &img);
 cv::Mat letterbox(cv::Mat &img, cv::Size new_shape, cv::Scalar color, bool _auto, bool scaleFill, bool scaleup, int stride);
+void convertLetterboxCoords(cv::Rect &bbox, cv::Mat &img);
 
 
 
