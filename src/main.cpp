@@ -37,7 +37,6 @@ int main(int argc, char ** argv)
 
 
     system("clear");    // hoping you are using linux :)
-
     // print commands
     cout << "Press 'q' or ESC key to quit (or exit current presentation)" << endl;
     cout << "Press 'd' to move to next picture "  << endl;
@@ -65,6 +64,8 @@ int main(int argc, char ** argv)
     } while (nxt = (char)waitKey(0));
 
     exit(EXIT_SUCCESS); // not necessary but why not
+
+    return 0;
 }
 
 

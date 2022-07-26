@@ -301,3 +301,8 @@ void convertLetterboxCoords(cv::Rect &bbox, cv::Mat &img)
     if (img.rows - bbox.y - bbox.height <= 0)
         bbox.height = img.rows - bbox.y - 1;
 }
+
+float computeScore(){
+
+    return 0;
+}
