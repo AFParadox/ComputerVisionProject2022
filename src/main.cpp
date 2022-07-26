@@ -2,6 +2,7 @@
 #include <handSegmentation.hpp>
 
 #include <opencv2/highgui.hpp>
+#include <opencv2/dnn.hpp>
 
 #include <iostream>
 #include <string>
@@ -11,7 +12,7 @@ using namespace std;
 using namespace cv;
 
 const string datasetPath = "../docs/evaluationDataset/rgb/";
-const string weightsPath = "../yoloWeights.pt";
+const string modelPath = "../best_img512_batch10_epochs120_L.onnx";
 
 
 void sortNames(vector<string> & names);   // simple sorting algorithm
@@ -35,6 +36,8 @@ int main(int argc, char ** argv)
     for (int i = 0; i < imgsPath.size(); i++)
         imgs.push_back(imread(imgsPath[i]));
 
+    // load yolov5 model
+    dnn::Net yolov5Model = loadModel(modelPath);
 
     system("clear");    // hoping you are using linux :)
     // print commands
@@ -55,7 +58,7 @@ int main(int argc, char ** argv)
         else if ((nxt == 'q') || (nxt == 27))       // exit by either pressing ESCAPE key or 'q'
             break;
 
-        vector<Rect> bboxes = localizeHands_opencvNN(imgs[i]);
+        vector<Rect> bboxes = localizeHands(imgs[i], yolov5Model);
         Mat mask = segmentHandsWatershed(imgs[i], bboxes);
 
         showBBoxes(imgs[i], bboxes, i);
@@ -86,24 +89,6 @@ void sortNames(vector<string>& names)
             }
         }
         if (!iteration) break;
-    }
-}
-
-
-void saveAllHandIstancesCropped(vector<string> imgPaths, string yoloOutputDir, string saveDirLocation)
-{
-    for (int i = 0; i < imgPaths.size(); i++)
-    {
-        // get image name
-        size_t nameBegin = imgPaths[i].find_last_of('/') + 1;
-        size_t nameLenght = imgPaths[i].find_last_of('.', nameBegin) + 1;
-        string name = imgPaths[i].substr(nameBegin, nameLenght);
-
-        // load image
-        //HandData data = loadImgAndBboxes(imgPaths[i], getLabelsFilename(imgPaths[i], yoloOutputDir));
-
-        // save hand istances
-        //saveHandIstances(name, data, saveDirLocation);
     }
 }
 

@@ -15,6 +15,9 @@ using namespace cv;
 // Regulates how big the centralKernel used to define hand markers for watershed. The bigger it is the smaller the centralKernel will be
 const int centralKernelParam = 10;
 
+const float GRAPH_SEGMENTATION_K = 0.6F;
+const float GRAPH_SEGMENTATION_SIGMA = 60.F;
+const int GRAPH_SEGMENTATION_MINSIZE = 50;
 
 
 void preprocessBilateral(Mat * img, int n, double sigmaColor, double sigmaSpace, int kSize)
@@ -74,7 +77,7 @@ Mat segmentHandsWatershed(cv::Mat img, std::vector<cv::Rect> bboxes)
         // preprocessing
         //preprocessSharpenGaussian(&subhand, 5, 10.);
         preprocessDrawCannyOnImg(&subhand, 50., 50.);
-        //preprocessBilateral(&subhand, 1, 4., 1000., 3);
+        //preprocessBilateral(&subhand, 1, 3., 1000., 3);
 
         // finally apply watershed on subimage
         Mat singleHandMarkers = singleHandWatershed(original, subhand);
@@ -131,7 +134,7 @@ bool cmpVec3bs(cv::Vec3b v1, cv:: Vec3b v2, cv::Vec3b thresh)
 void setHandMarkersWithGraphSegm(Mat hand, Rect centralKernel, Mat * markers)
 {
     // do graph segmentation
-    Ptr<ximgproc::segmentation::GraphSegmentation> segmentor = ximgproc::segmentation::createGraphSegmentation(0.6, 100, 200);
+    Ptr<ximgproc::segmentation::GraphSegmentation> segmentor = ximgproc::segmentation::createGraphSegmentation(GRAPH_SEGMENTATION_SIGMA, GRAPH_SEGMENTATION_K, GRAPH_SEGMENTATION_MINSIZE);
     Mat mask;
     segmentor.get()->processImage(hand, mask);
 

@@ -13,150 +13,36 @@ using namespace std;
 using namespace cv;
 using namespace cv::dnn;
 
-const string yoloPath = "../src/yolov5/";
-const string yoloLabelsDirPath = "../src/yolov5/runs/detect/hand_det/labels/";
 
-const string nnWeights = "../bestM.onnx";
-
-const float INPUT_WIDTH = 640.0;
-const float INPUT_HEIGHT = 640.0;
+const float INPUT_IMG_SIZE = 640.0;
 const float SCORE_THRESHOLD = 0.5;
 const float NMS_THRESHOLD = 0.45;
 const float CONFIDENCE_THRESHOLD = 0.45;
 
 const Scalar RED = Scalar(0,0,255);
+const Scalar GREY_PADDING = Scalar(114,114,114);
 
 
-vector<vector<Rect>> localizeHands(string datasetPath, string weightsPath, vector<string> imgsPath)
+Net loadModel(string modelPath)
 {
-    // run yolo detect.py
-    runYoloDetection(datasetPath, weightsPath);
+    // Load model
+    Net model = readNet(modelPath);
 
-    vector<vector<Rect>> allDatasetBBoxes;
-    for (int i = 0; i < imgsPath.size(); i++)
-    {
-        Mat img = imread(imgsPath[i]);  // load img just to get width and height
-        string labelsFilePath = yoloLabelsDirPath + getLabelsName(imgsPath[i]);
-        allDatasetBBoxes.push_back( loadFromYolo(labelsFilePath, (double)img.rows, (double)img.cols) );
-    }
-    
-    return allDatasetBBoxes;
+    // use cuda to make computation fasterù
+    model.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
+    model.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
+
+    return model;
 }
 
-
-void runYoloDetection(string datasetPath, string weightsPath)
+vector<Rect> localizeHands(Mat &img, Net &net)     // https://github.com/spmallick/learnopencv/tree/master/Object-Detection-using-YOLOv5-and-OpenCV-DNN-in-CPP-and-Python
 {
-    // must remove yolo runs directory each time before detection
-    if (filesystem::exists(yoloPath + "runs/"))
-        filesystem::remove_all(yoloPath + "runs/");
-
-    // write command to detect with yolo
-    string detectCommand = "python " + yoloPath + "detect.py --source " + datasetPath + " --weights " + weightsPath + " --conf 0.4 --name hand_det --nosave --save-txt";
-
-    // detect with yolo
-    cout << "hand detection starting..." << endl;
-    system(detectCommand.c_str());
-    cout << endl << endl;
-}
-
-
-string getLabelsName(string imageFilename)
-{
-    // find where name begins and ends
-    size_t nameBegin = imageFilename.find_last_of('/') + 1;
-    size_t nameLenght = imageFilename.find_last_of('.', nameBegin) + 1;
-    
-    // isolate name
-    string name = imageFilename.substr(nameBegin, nameLenght);
-
-    return name + ".txt";
-}
-
-
-vector<Rect> loadFromYolo(string yoloLabelsPath, double imgHeight, double imgWidth)
-{
-    vector<Rect> bboxes;
-
-    if (filesystem::exists(yoloLabelsPath))   // if labels file does not exists means that no hands were detected
-    {
-        // bboxes from file
-        ifstream myFile(yoloLabelsPath);
-        int classID;
-        double propX, propY, propW, propH; // prop stands for "proportional" since yolo outputs coordinates are all divided by picure size
-        int x, y, w, h;
-
-        int j = 0;
-        while (myFile >> classID >> propX >> propY >> propW >> propH)
-        {
-            // convert coordinates from yolo notation to classic one
-            w = (int)(imgWidth * propW);
-            h = (int)(imgHeight * propH);
-
-            x = (int)(imgWidth * propX) - w / 2;
-            y = (int)(imgHeight * propY) - h / 2;
-
-            Rect r(x, y, w, h);
-            bboxes.push_back(r);
-            j++;
-        }
-    }
-
-    return bboxes;
-}
-
-
-void saveLabels2PtNotation(vector<string> imgsPath, string saveDir, vector<vector<Rect>> allDatasetBBoxes)
-{
-    for (int i = 0; i < imgsPath.size(); i++)
-    {
-        string newLabelsName = saveDir + getLabelsName(imgsPath[i]);
-        
-        // delete file if it already exists
-        if (filesystem::exists(newLabelsName))
-            filesystem::remove(newLabelsName);
-
-        // open output file
-        ofstream myStream;
-        myStream.open(newLabelsName);
-        
-        for (int j = 0; j < allDatasetBBoxes[i].size(); j++)
-            myStream << allDatasetBBoxes[i][j].x << allDatasetBBoxes[i][j].y << allDatasetBBoxes[i][j].width << allDatasetBBoxes[i][j].height << endl;
-        
-        // close file
-        myStream.close();
-    }
-}
-
-void showBBoxes(Mat img, vector<Rect> bboxes, int imgNum)
-{
-    Mat displayImg = img.clone();
-    for (int i = 0; i < bboxes.size(); i++)
-        rectangle(displayImg, bboxes[i], Scalar(0,0,255), 2);
-    
-    // show image with bounding boxes and rename window according number(helps viewing)
-    imshow("bboxDisplay", displayImg);
-    setWindowTitle("bboxDisplay", "Localization Results: image n° " + to_string(imgNum));
-}
-
-
-
-
-
-
-
-
-vector<Rect> localizeHands_opencvNN(Mat &img)     // https://github.com/spmallick/learnopencv/tree/master/Object-Detection-using-YOLOv5-and-OpenCV-DNN-in-CPP-and-Python
-{
-    // Load model.
-    Net net;
-    net = readNet(nnWeights);
-
-    // not sure if the input need to be agumented with letterbox...
-    Mat yoloResizedImg = letterbox(img, Size(640, 640), Scalar(114, 114, 114), false, false, true, 32);
+    // scale and resize image with padding preventing img stretch
+    Mat yoloResizedImg = letterbox(img, Size(INPUT_IMG_SIZE, INPUT_IMG_SIZE), GREY_PADDING, false, false, true, 32);
 
     // Convert to blob.
     Mat blob;
-    blobFromImage(yoloResizedImg, blob, 1./255., Size(INPUT_WIDTH, INPUT_HEIGHT), Scalar(), true, false);
+    blobFromImage(yoloResizedImg, blob, 1./255., Size(INPUT_IMG_SIZE, INPUT_IMG_SIZE), Scalar(), true, false);
 
     net.setInput(blob);
 
@@ -169,8 +55,8 @@ vector<Rect> localizeHands_opencvNN(Mat &img)     // https://github.com/spmallic
     vector<Rect> boxes; 
 
     // Resizing factor.
-    float x_factor = yoloResizedImg.cols / INPUT_WIDTH;
-    float y_factor = yoloResizedImg.rows / INPUT_HEIGHT;
+    float x_factor = yoloResizedImg.cols / INPUT_IMG_SIZE;
+    float y_factor = yoloResizedImg.rows / INPUT_IMG_SIZE;
 
     float *data = (float *)detections[0].data;
 
@@ -266,22 +152,22 @@ void convertLetterboxCoords(cv::Rect &bbox, cv::Mat &img)
     float xPrime = 0.F, yPrime = 0.F;
 
     float imgAspectRatio = imgWidth / imgHeight;
-    float dnnInputAspectRatio = INPUT_WIDTH / INPUT_HEIGHT;
+    float dnnInputAspectRatio = INPUT_IMG_SIZE / INPUT_IMG_SIZE;    // this one is beacuse we hoped to be able to use yolo with image size of 640x320 or something like that
 
     if (imgAspectRatio >= dnnInputAspectRatio)
     {
-        scaleRatio = imgWidth / INPUT_WIDTH;
+        scaleRatio = imgWidth / INPUT_IMG_SIZE;
         smallSideSize = imgHeight / scaleRatio; // big side size is equal to INPUT_WIDTH
-        padding = (INPUT_HEIGHT - smallSideSize) / 2.F;
+        padding = (INPUT_IMG_SIZE - smallSideSize) / 2.F;
 
         xPrime = (float)bbox.x;
         yPrime = (float)bbox.y - padding;
     }
     else
     {
-        scaleRatio = imgHeight / INPUT_HEIGHT;
+        scaleRatio = imgHeight / INPUT_IMG_SIZE;
         smallSideSize = imgWidth / scaleRatio; // big side size is equal to INPUT_WIDTH
-        padding = (INPUT_WIDTH - smallSideSize) / 2.F;
+        padding = (INPUT_IMG_SIZE - smallSideSize) / 2.F;
 
         xPrime = (float)bbox.x - padding;
         yPrime = (float)bbox.y;
@@ -301,6 +187,19 @@ void convertLetterboxCoords(cv::Rect &bbox, cv::Mat &img)
     if (img.rows - bbox.y - bbox.height <= 0)
         bbox.height = img.rows - bbox.y - 1;
 }
+
+
+void showBBoxes(Mat img, vector<Rect> bboxes, int imgNum)
+{
+    Mat displayImg = img.clone();
+    for (int i = 0; i < bboxes.size(); i++)
+        rectangle(displayImg, bboxes[i], Scalar(0,0,255), 2);
+    
+    // show image with bounding boxes and rename window according number(helps viewing)
+    imshow("bboxDisplay", displayImg);
+    setWindowTitle("bboxDisplay", "Localization Results: image n° " + to_string(imgNum));
+}
+
 
 float computeScore(){
 

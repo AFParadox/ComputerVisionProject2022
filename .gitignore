@@ -1,2 +1,3 @@
 build/
+best_img512_batch10_epochs120_L.onnx
 *.pyc
