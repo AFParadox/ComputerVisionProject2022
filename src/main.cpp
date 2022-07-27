@@ -13,12 +13,16 @@ using namespace std;
 using namespace cv;
 
 const string annotationsPath = "../docs/evaluationDataset/det/";
+const string trueMasksPath = "../docs/evaluationDataset/mask/";
 const string datasetPath = "../docs/evaluationDataset/rgb/";
-const string modelPath = "../best_img512_batch10_epochs120_L.onnx";
+const string modelPath = "../best_img640_batch20_epochs60_M.onnx";
 
 
 void sortNames(vector<string> & names);   // simple sorting algorithm
 void resultsSlideshow(vector<Mat> imgs, vector<vector<Rect>> allDatasetBBoxes, vector<Mat> masks);   // display results nicely
+
+double scoreLocalization(string trueCoordFilename, vector<Rect> bboxes, int rows, int cols);
+double scoreSegmentation(string trueMaskFilename, Mat mask);
 
 
 int main(int argc, char ** argv) 
@@ -28,44 +32,13 @@ int main(int argc, char ** argv)
     for (const auto & entry : filesystem::directory_iterator(datasetPath))
         imgsPath.push_back(entry.path());
     
-    // load each annotation path into vector
-    vector<string> labelsPath;
-    for (const auto & entry: filesystem::directory_iterator(annotationsPath))
-        labelsPath.push_back(entry.path());
-    
     // sort them
     sortNames(imgsPath);
-    sortNames(labelsPath);
 
     // load images into memory
     vector<Mat> imgs;
     for (int i = 0; i < imgsPath.size(); i++)
         imgs.push_back(imread(imgsPath[i]));
-    
-    // load annotations into memory
-    vector<Rect> labels;
-    string delimiter = " ";
-    int center_x;
-    int center_y;
-    int width;
-    int height;
-    for (int i = 0; i < labelsPath.size(); i++){
-        ifstream labelFile;
-        labelFile.open(labelsPath[i]);
-        if (!labelFile){
-            cout << "Unable to open " << labelsPath[i] << endl;
-            exit(1);
-        }
-        string bbox;
-        while(getline(labelFile, bbox)){
-            center_x = stoi(bbox.substr(0, bbox.find(delimiter)));
-            center_y = stoi(bbox.substr(1, bbox.find(delimiter)));
-            width = stoi(bbox.substr(2, bbox.find(delimiter)));
-            height = stoi(bbox.substr(3, bbox.find(delimiter)));
-            cout << center_x << ' ' << center_y << ' ' << width << ' ' << height << endl; //PORCODDIO NON VA
-        }
-        cout << endl;
-    }
 
     // load yolov5 model
     dnn::Net yolov5Model = loadModel(modelPath);
@@ -97,6 +70,17 @@ int main(int argc, char ** argv)
         showBBoxes(imgs[i], bboxes, i);
         showSegmentedHands(imgs[i], mask, i, handColor);
 
+        // compute localization score
+        string trueBBoxesPath = annotationsPath + imgsPath[i].substr(imgsPath[i].find_last_of('/')+1, 2) + string(".txt");
+        double currentLocScore = scoreLocalization(trueBBoxesPath, bboxes, imgs[i].rows, imgs[i].cols);
+
+        // compute pixel accuracy score
+        string currentMaskPath = trueMasksPath + imgsPath[i].substr(imgsPath[i].find_last_of('/')+1, 2) + string(".png");
+        double currentSegmScore = scoreSegmentation(currentMaskPath, mask);
+
+        // print score
+        cout << "Image " << to_string(i) << " has bounding boxes IoU = " << to_string(currentLocScore) << " and segmentation pixel accuracy of " << to_string(currentSegmScore) << endl;
+
     } while (nxt = (char)waitKey(0));
 
     return 0;
@@ -123,5 +107,36 @@ void sortNames(vector<string>& names)
     }
 }
 
+
+
+double scoreLocalization(string trueCoordFilename, vector<Rect> bboxes, int rows, int cols)
+{
+    // load file
+    // load annotations into memory
+    vector<Rect> trueLabels;
+
+    ifstream labelFile;
+    labelFile.open(trueCoordFilename);
+    if (!labelFile) // check if file has been opened succesfully
+    {
+        cout << "Unable to open " << trueCoordFilename << endl;
+        exit(1);
+    }
+    string bbox_str;
+
+    int x, y, w, h;
+    while (labelFile >> x >> y >> w >> h)
+        trueLabels.push_back(Rect(x, y, w, h));
+
+    return computeIOU(trueLabels, bboxes, rows, cols);
+}
+
+
+double scoreSegmentation(string trueMaskFilename, Mat mask)
+{
+    Mat trueMask = imread(trueMaskFilename, IMREAD_GRAYSCALE);
+
+    return computePixelAccuracyScore(mask, trueMask);
+}
 
 

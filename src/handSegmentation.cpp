@@ -12,6 +12,9 @@
 using namespace std;
 using namespace cv;
 
+
+const float BBOX_ENLARGMENT_SIZE = 1.1F;
+
 // Regulates how big the centralKernel used to define hand markers for watershed. The bigger it is the smaller the centralKernel will be
 const int centralKernelParam = 10;
 
@@ -47,8 +50,8 @@ void preprocessDrawCannyOnImg(cv::Mat * img, double t1, double t2)
     Mat cannyImg;
     Canny(*img, cannyImg, t1, t2);
 
-    //morphologyEx(cannyImg, cannyImg, MORPH_DILATE, getStructuringElement(MORPH_CROSS, Size(3,3)), Point(-1,-1), 3);
-    //morphologyEx(cannyImg, cannyImg, MORPH_ERODE, getStructuringElement(MORPH_RECT, Size(1,3)), Point(-1,-1), 1);
+    //morphologyEx(cannyImg, cannyImg, MORPH_DILATE, getStructuringElement(MORPH_RECT, Size(3,3)), Point(-1,-1), 1);
+    //morphologyEx(cannyImg, cannyImg, MORPH_ERODE, getStructuringElement(MORPH_CROSS, Size(3,3)), Point(-1,-1), 1);
 
     for (int i = 0; i < img->rows; i++)
         for (int j = 0; j < img->cols; j++)
@@ -68,9 +71,12 @@ Mat segmentHandsWatershed(cv::Mat img, std::vector<cv::Rect> bboxes)
     // extract hand subimage and clone it in order to not preprocess areas of the original image. Do this using each hand bbox
     for (int i = 0; i < bboxes.size(); i++)
     {
+        // enlarge bbox
+        Rect bbox = enlargeBBox(bboxes[i], img.rows, img.cols, BBOX_ENLARGMENT_SIZE);
+
         // crop hand and clone
-        Point bboxStart(bboxes[i].x, bboxes[i].y);
-        Mat original = img(Range(bboxStart.y, bboxStart.y + bboxes[i].height), Range(bboxStart.x, bboxStart.x + bboxes[i].width));
+        Point bboxStart(bbox.x, bbox.y);
+        Mat original = img(Range(bboxStart.y, bboxStart.y + bbox.height), Range(bboxStart.x, bboxStart.x + bbox.width));
 
         Mat subhand = original.clone();
 
@@ -94,6 +100,33 @@ Mat segmentHandsWatershed(cv::Mat img, std::vector<cv::Rect> bboxes)
     }
 
     return handsMarkers;
+}
+
+
+Rect enlargeBBox(Rect bbox, int rows, int cols, float scale)
+{
+    Rect enlarged;
+
+    enlarged.x = bbox.x - (int)round(((scale - 1.F) * (float)bbox.width) / 2.F);
+    enlarged.y = bbox.y - (int)round(((scale - 1.F) * (float)bbox.height) / 2.F);
+
+    enlarged.width = (int)((float)bbox.width * scale);
+    enlarged.height = (int)((float)bbox.height * scale);
+
+    // check if enlarged rect goes out of bounds
+    if (enlarged.x < 0)
+        enlarged.x = 0;
+
+    if (enlarged.y < 0)
+        enlarged.y = 0;
+
+    if (enlarged.x + enlarged.width >= cols)
+        enlarged.width = cols - enlarged.x - 1;
+
+    if (enlarged.y + enlarged.height >= rows)
+        enlarged.height = rows -enlarged.y -1;
+
+    return enlarged;
 }
 
 
@@ -216,6 +249,29 @@ void setBackgroundMarkers(Mat img, Mat * markers)
         if (cmpVec3bs(mean, img.at<Vec3b>(i,img.cols-2), stdDev))
             markers->at<int>(i,img.cols-2) = 1;
 }
+
+
+double computePixelAccuracyScore(cv::Mat mask, cv::Mat trueMask)
+{
+    int correctlyClassified = 0;
+    int allPixelClassified = 0;
+
+    for (int row = 0; row < mask.rows; row++)
+    {
+        for (int col = 0; col < mask.cols; col++)
+        {
+            if (mask.at<uchar>(row,col) == (uchar)255U)
+            {
+                allPixelClassified++;
+                if (trueMask.at<uchar>(row,col) == (uchar)255U)
+                    correctlyClassified++;
+            }
+        }
+    }
+    
+    return ((double)correctlyClassified / (double)allPixelClassified);
+}
+
 
 
 void showSegmentedHands(Mat img, Mat mask, int imgNum, Vec3b regionColor)

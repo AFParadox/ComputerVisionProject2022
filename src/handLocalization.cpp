@@ -28,9 +28,9 @@ Net loadModel(string modelPath)
     // Load model
     Net model = readNet(modelPath);
 
-    // use cuda to make computation fasterù
-    model.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
-    model.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
+    // use cuda to make computation faster
+    //model.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
+    //model.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
 
     return model;
 }
@@ -212,6 +212,45 @@ void showBBoxes2(Mat img, vector<Rect> bboxes, vector<Rect> ground_truth,  int i
     imshow("bboxDisplay", displayImg);
     setWindowTitle("bboxDisplay", "Localization Results: image n° " + to_string(imgNum));
 }
+
+double computeIOU(std::vector<cv::Rect> trueBBoxes, std::vector<cv::Rect> bboxes, int rows, int cols)
+{
+    Mat trueBBoxesRepresentation = Mat::zeros(Size(rows,cols), CV_8UC1);
+    Mat bboxesRepresetation = Mat::zeros(Size(rows,cols), CV_8UC1);
+
+    // draw full white bboxes
+    for (int i = 0; i < trueBBoxes.size(); i++)
+        rectangle(trueBBoxesRepresentation, trueBBoxes[i], (uchar)255U, FILLED);
+
+    for (int i = 0; i < bboxes.size(); i++)
+        rectangle(bboxesRepresetation, bboxes[i], (uchar)255U, FILLED);
+
+    Mat intersection;
+    bitwise_and(trueBBoxesRepresentation, bboxesRepresetation, intersection);
+
+    Mat union_;
+    bitwise_or(trueBBoxesRepresentation, bboxesRepresetation, union_);
+
+    // count number of union pixels
+    double unionPxs = 0.;
+    for (int row = 0; row < rows; row++)
+        for (int col = 0; col < cols; col++)
+            if (union_.at<uchar>(row,col) == (uchar)255U)
+                unionPxs++;
+
+    // count number of intersection pixels
+    double intersectionPxs = 0.;
+    for (int row = 0; row < rows; row++)
+        for (int col = 0; col < cols; col++)
+            if (intersection.at<uchar>(row,col) == (uchar)255U)
+                intersectionPxs++;
+    
+    return intersectionPxs / unionPxs;
+}
+
+
+
+
 
 // This method returns the score of the bbox passed to it compared to the ground truth
 float bbox_IoU(Rect bbox, Rect ground_truth){
