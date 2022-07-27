@@ -200,8 +200,32 @@ void showBBoxes(Mat img, vector<Rect> bboxes, int imgNum)
     setWindowTitle("bboxDisplay", "Localization Results: image n° " + to_string(imgNum));
 }
 
+// This method prints both the bbox we obtained and the ground truth
+void showBBoxes2(Mat img, vector<Rect> bboxes, vector<Rect> ground_truth,  int imgNum)
+{
+    Mat displayImg = img.clone();
+    for (int i = 0; i < bboxes.size(); i++){
+        rectangle(displayImg, bboxes[i], Scalar(0,0,255), 2);
+        rectangle(displayImg, ground_truth[i], Scalar(0,255,0), 2);
+    }
+    // show image with bounding boxes and rename window according number(helps viewing)
+    imshow("bboxDisplay", displayImg);
+    setWindowTitle("bboxDisplay", "Localization Results: image n° " + to_string(imgNum));
+}
 
-float computeScore(){
+// This method returns the score of the bbox passed to it compared to the ground truth
+float bbox_IoU(Rect bbox, Rect ground_truth){
+    float IoU;
 
-    return 0;
+    if (bbox.tl().x > ground_truth.tl().x)
+        float xA = bbox.tl().x;
+    else
+        float xA = ground_truth.tl().x;
+
+    if (bbox.tl().y > ground_truth.tl().y)
+        float yA = bbox.tl().y;
+    else
+        float yA = ground_truth.tl().y;
+
+    return IoU;
 }
