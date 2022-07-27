@@ -4,6 +4,7 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/dnn.hpp>
 
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <filesystem>
@@ -11,6 +12,7 @@
 using namespace std;
 using namespace cv;
 
+const string annotationsPath = "../docs/evaluationDataset/det/";
 const string datasetPath = "../docs/evaluationDataset/rgb/";
 const string modelPath = "../best_img512_batch10_epochs120_L.onnx";
 
@@ -26,13 +28,44 @@ int main(int argc, char ** argv)
     for (const auto & entry : filesystem::directory_iterator(datasetPath))
         imgsPath.push_back(entry.path());
     
+    // load each annotation path into vector
+    vector<string> labelsPath;
+    for (const auto & entry: filesystem::directory_iterator(annotationsPath))
+        labelsPath.push_back(entry.path());
+    
     // sort them
     sortNames(imgsPath);
+    sortNames(labelsPath);
 
     // load images into memory
     vector<Mat> imgs;
     for (int i = 0; i < imgsPath.size(); i++)
         imgs.push_back(imread(imgsPath[i]));
+    
+    // load annotations into memory
+    vector<Rect> labels;
+    string delimiter = " ";
+    int center_x;
+    int center_y;
+    int width;
+    int height;
+    for (int i = 0; i < labelsPath.size(); i++){
+        ifstream labelFile;
+        labelFile.open(labelsPath[i]);
+        if (!labelFile){
+            cout << "Unable to open " << labelsPath[i] << endl;
+            exit(1);
+        }
+        string bbox;
+        while(getline(labelFile, bbox)){
+            center_x = stoi(bbox.substr(0, bbox.find(delimiter)));
+            center_y = stoi(bbox.substr(1, bbox.find(delimiter)));
+            width = stoi(bbox.substr(2, bbox.find(delimiter)));
+            height = stoi(bbox.substr(3, bbox.find(delimiter)));
+            cout << center_x << ' ' << center_y << ' ' << width << ' ' << height << endl; //PORCODDIO NON VA
+        }
+        cout << endl;
+    }
 
     // load yolov5 model
     dnn::Net yolov5Model = loadModel(modelPath);
