@@ -15,9 +15,9 @@ using namespace cv;
 // Regulates how big the centralKernel used to define hand markers for watershed. The bigger it is the smaller the centralKernel will be
 const int centralKernelParam = 10;
 
-const float GRAPH_SEGMENTATION_K = 0.6F;
-const float GRAPH_SEGMENTATION_SIGMA = 60.F;
-const int GRAPH_SEGMENTATION_MINSIZE = 50;
+const float GRAPH_SEGMENTATION_K = 0.4F;
+const float GRAPH_SEGMENTATION_SIGMA = 50.F;
+const int GRAPH_SEGMENTATION_MINSIZE = 60;
 
 
 void preprocessBilateral(Mat * img, int n, double sigmaColor, double sigmaSpace, int kSize)
@@ -303,7 +303,7 @@ void showHandPreprocSegm(Mat original, Mat preprocessed, Mat regionsMask)
 }
 
 
-void saveHandIstances(std::string name, cv::Mat img, std::vector<cv::Rect> bboxes, std::string destDir)
+void saveHandIstances(string name, Mat img, vector<Rect> bboxes, string destDir)
 {
     for (int i = 0; i < bboxes.size(); i++)
     {

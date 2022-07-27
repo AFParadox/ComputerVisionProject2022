@@ -18,8 +18,6 @@ const string modelPath = "../best_img512_batch10_epochs120_L.onnx";
 void sortNames(vector<string> & names);   // simple sorting algorithm
 void resultsSlideshow(vector<Mat> imgs, vector<vector<Rect>> allDatasetBBoxes, vector<Mat> masks);   // display results nicely
 
-void saveAllHandIstancesCropped(vector<string> imgPaths, string yoloOutputDir, string saveDirLocation);     // save hand instances in sigle files(useful when trying things for segmentation)
-
 
 int main(int argc, char ** argv) 
 {
@@ -61,12 +59,12 @@ int main(int argc, char ** argv)
         vector<Rect> bboxes = localizeHands(imgs[i], yolov5Model);
         Mat mask = segmentHandsWatershed(imgs[i], bboxes);
 
+        //saveHandIstances(to_string(i), imgs[i], bboxes, "../../../Documents/hands_cropped/");
+
         showBBoxes(imgs[i], bboxes, i);
         showSegmentedHands(imgs[i], mask, i, handColor);
 
     } while (nxt = (char)waitKey(0));
-
-    exit(EXIT_SUCCESS); // not necessary but why not
 
     return 0;
 }
