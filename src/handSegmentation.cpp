@@ -13,7 +13,7 @@ using namespace std;
 using namespace cv;
 
 
-const float BBOX_ENLARGMENT_SIZE = 1.1F;
+const float BBOX_ENLARGMENT_SIZE = 1.15F;
 
 // Regulates how big the centralKernel used to define hand markers for watershed. The bigger it is the smaller the centralKernel will be
 const int centralKernelParam = 10;
