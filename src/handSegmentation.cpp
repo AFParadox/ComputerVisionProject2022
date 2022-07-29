@@ -350,7 +350,11 @@ void showHandPreprocSegm(Mat original, Mat preprocessed, Mat regionsMask)
             segmented.at<Vec3b>(i,original.cols-2) = Vec3b((uchar)0, (uchar)255, (uchar)0);
 
     imshow("original", original);
-    imshow("preprocessed", preprocessed);
+
+    Mat preprocScaled;
+    resize(preprocessed, preprocScaled, Size(preprocessed.cols*3, preprocessed.rows*3));
+
+    imshow("preprocessed", preprocScaled);
     imshow("segmented", segmented);
 
     char c = (char)waitKey(0);
