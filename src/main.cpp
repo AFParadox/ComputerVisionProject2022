@@ -51,7 +51,6 @@ int main(int argc, char ** argv)
 
     char nxt = 't';
     int i = 0;
-    Vec3b handColor = Vec3b(0,0,200);   // kind of red
 
     do
     {
@@ -68,7 +67,7 @@ int main(int argc, char ** argv)
         //saveHandIstances(to_string(i), imgs[i], bboxes, "../../../Documents/hands_cropped/");
 
         showBBoxes(imgs[i], bboxes, i);
-        showSegmentedHands(imgs[i], mask, i, handColor);
+        showSegmentedHands(imgs[i], mask, i);
 
         // compute localization score
         string trueBBoxesPath = annotationsPath + imgsPath[i].substr(imgsPath[i].find_last_of('/')+1, 2) + string(".txt");

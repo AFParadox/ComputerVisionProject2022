@@ -96,7 +96,7 @@ Mat segmentHandsWatershed(cv::Mat img, std::vector<cv::Rect> bboxes)
         for (int row = 0; row < subhand.rows; row++)
             for (int col = 0; col < subhand.cols; col++)
                 if (singleHandMarkers.at<int>(row,col) > 0)
-                    subMarkers.at<uchar>(row,col) = (uchar)255U;
+                    subMarkers.at<uchar>(row,col) = (uchar)i+1;
     }
 
     return handsMarkers;
@@ -260,10 +260,10 @@ double computePixelAccuracyScore(cv::Mat mask, cv::Mat trueMask)
     {
         for (int col = 0; col < mask.cols; col++)
         {
-            if (mask.at<uchar>(row,col) == (uchar)255U)
+            if (mask.at<uchar>(row,col) != (uchar)0U)
             {
                 allPixelClassified++;
-                if (trueMask.at<uchar>(row,col) == (uchar)255U)
+                if (trueMask.at<uchar>(row,col) != (uchar)0U)
                     correctlyClassified++;
             }
         }
@@ -274,16 +274,18 @@ double computePixelAccuracyScore(cv::Mat mask, cv::Mat trueMask)
 
 
 
-void showSegmentedHands(Mat img, Mat mask, int imgNum, Vec3b regionColor)
+void showSegmentedHands(Mat img, Mat mask, int imgNum)
 {
-    regionColor /= 2;   // in order to not overflow the color
+    vector<Vec3b> handColors;
+    for (int i = 0; i < 10; i++)
+        handColors.push_back(Vec3b((uchar)theRNG().uniform(0,127), (uchar)theRNG().uniform(0,127), (uchar)theRNG().uniform(0,127)));
 
     // color the image on the segmented area
     Mat segmented = img.clone();
     for (int row = 0; row < img.rows; row++)
         for (int col = 0; col < img.cols; col++)
-            if (mask.at<uchar>(row,col) == (uchar)255U)
-                segmented.at<Vec3b>(row,col) = segmented.at<Vec3b>(row,col)/2 + regionColor;
+            if (mask.at<uchar>(row,col) != (uchar)0U)
+                segmented.at<Vec3b>(row,col) = segmented.at<Vec3b>(row,col)/2 + handColors[(int)mask.at<uchar>(row,col)];
     
     // show image with segmented hands and rename window according number(helps viewing)
     imshow("segmentationDisplay", segmented);

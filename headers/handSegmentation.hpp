@@ -16,7 +16,7 @@ void setHandMarkersWithGraphSegm(cv::Mat hand, cv::Rect centralKernel, cv::Mat *
 void setBackgroundMarkers(cv::Mat img, cv::Mat * markers);  // compute background markers around bounding box edges while not selecting as markers pixels which color is similar to skin
 
 
-void showSegmentedHands(cv::Mat img, cv::Mat mask, int imgNum, cv::Vec3b regionColor);
+void showSegmentedHands(cv::Mat img, cv::Mat mask, int imgNum);
 
 
 double computePixelAccuracyScore(cv::Mat mask, cv::Mat trueMask);
