@@ -4,7 +4,6 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/dnn.hpp>
 
-#include <filesystem>
 #include <string>
 #include <fstream>
 #include <iostream>

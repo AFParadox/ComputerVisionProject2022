@@ -7,14 +7,13 @@
 #include <fstream>
 #include <iostream>
 #include <string>
-#include <filesystem>
 
 using namespace std;
 using namespace cv;
 
-const string annotationsPath = "../docs/evaluationDataset/det/";
-const string trueMasksPath = "../docs/evaluationDataset/mask/";
-const string datasetPath = "../docs/evaluationDataset/rgb/";
+const string annotationsPath = "../docs/evaluationDataset/det/";    // *.txt
+const string trueMasksPath = "../docs/evaluationDataset/mask/";     // *.png
+const string datasetPath = "../docs/evaluationDataset/rgb/";        // *.jpg
 const string modelPath = "../best_img640_batch20_epochs60_M.onnx";
 
 
@@ -29,8 +28,7 @@ int main(int argc, char ** argv)
 {
     // load each image path into vector
     vector<string> imgsPath;
-    for (const auto & entry : filesystem::directory_iterator(datasetPath))
-        imgsPath.push_back(entry.path());
+    glob(datasetPath + "*.jpg", imgsPath, true);
     
     // sort them
     sortNames(imgsPath);
