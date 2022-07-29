@@ -10,3 +10,6 @@ Project structure:
 - headers: contains headers files
 - docs: contains the report, the assignment and the evaluation dataset
 - support: containt all additional code used to produce this project, e.g. scripts to convert the annotations, or codes to tune the segmentation part.
+
+NOTE:
+We initially positioned the python notebooks in the src directory due to their importance in the overall project, but finally moved them into the support directory since they are not stricly part of what we need to run the project.
